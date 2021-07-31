@@ -1,10 +1,10 @@
 from flask import Flask,request,jsonify
 from flask_pymongo import PyMongo
+from pymongo import MongoClient
 from flask_cors import CORS
 from datetime import datetime, timedelta
 import jwt
 from functools import wraps
-
 
 
 app = Flask(__name__)
@@ -12,6 +12,8 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 
 
 app.config["MONGO_URI"] = "mongodb://localhost:27017/Users"
+
+# mongodb+srv://sumit:<password>@cluster0.uuqyj.mongodb.net/myFirstDatabase?retryWrites=true&w=majority
 mongo = PyMongo(app)
 
 secret = "OneAssure"
@@ -43,7 +45,7 @@ def register():
     code = 500
     status = "fail"
     try:
-        data = request.form
+        data = request.get_json()
         check = mongo.db.record.find(dict(email=data['email']))
         if check.count() >= 1:
             message = "User already exists :("
@@ -68,8 +70,8 @@ def login():
     code = 500
     status = "fail"
     try:
-        data = request.form
-        user =  mongo.db.record.find_one({"email": data["email"]})
+        data = request.get_json()
+        user =  mongo.db.record.find_one({"email": data['email']})
         if user:
             user['_id'] = str(user['_id'])
             if user and user['password'] == data['password']:
@@ -92,7 +94,6 @@ def login():
 
                 
             else:
-                print("inside else")
                 message = "wrong password"
                 code = 401
                 status = "fail"
@@ -102,7 +103,6 @@ def login():
             status = "fail"
 
     except Exception as ex:
-        print("inside exception")
         message = f"{ex}"
         code = 500
         status = "fail"
@@ -118,10 +118,17 @@ def getusers():
     status = "fail"
 
     try:
-        for oneresult in mongo.db.record.find({}):
+        page=int(request.args.get('page'))
+        print(page)
+        
+        count=mongo.db.record.find({}).count()
+        print(count)
+        
+        for oneresult in mongo.db.record.find({}).skip(5*(page-1)).limit(5):
             oneresult['_id'] = str(oneresult['_id'])
             data.append(oneresult)
-        
+
+
         if data:
             message = "users data fetched successfully"
             status = "successful"
@@ -135,7 +142,7 @@ def getusers():
         message =  str(ee)
         status = "Error"
 
-    return jsonify({"status": status, "message":message,'data': data}), code
+    return jsonify({"status": status, "message":message,'data': data, 'total_page' : int(count/5 +1), 'total_users':count}), code
 
 if __name__ == "__main__":
     app.run(debug=True)
